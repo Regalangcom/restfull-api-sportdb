@@ -1,0 +1,424 @@
+openapi: 3.0.3
+info:
+  title: Sport API
+  description: >
+    Backend API gateway for TheSportsDB with Sanctum authentication and
+    per-user favorite teams. All responses follow a consistent envelope:
+    `{ "success": bool, "message": string, "data": mixed }`.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8000/api
+tags:
+  - name: Auth
+  - name: Leagues
+  - name: Teams
+  - name: Favorites
+
+paths:
+  /register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, password_confirmation]
+              properties:
+                name:
+                  type: string
+                  example: Jane Doe
+                email:
+                  type: string
+                  format: email
+                  example: jane@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessResponse"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Log in and receive an API token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: jane@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        "200":
+          description: Logged in successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Log out (revokes the current token)
+      security:
+        - sanctumToken: []
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /me:
+    get:
+      tags: [Auth]
+      summary: Get the authenticated user's profile
+      security:
+        - sanctumToken: []
+      responses:
+        "200":
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sports:
+    get:
+      tags: [Leagues]
+      summary: List available sports (use a strSport value as the `sport` filter of /leagues)
+      responses:
+        "200":
+          description: Sports retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /leagues:
+    get:
+      tags: [Leagues]
+      summary: List leagues with logo (strBadge), optionally filtered by sport
+      description: >
+        strBadge is the league logo URL, or null when TheSportsDB free tier
+        does not provide one for that league.
+      parameters:
+        - in: query
+          name: sport
+          schema:
+            type: string
+          example: Soccer
+          description: Filter leagues by sport name
+      responses:
+        "200":
+          description: Leagues retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /leagues/{league}/teams:
+    get:
+      tags: [Leagues]
+      summary: List teams belonging to a league
+      parameters:
+        - in: path
+          name: league
+          required: true
+          schema:
+            type: string
+          example: "4328"
+          description: TheSportsDB league ID
+      responses:
+        "200":
+          description: Teams retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /leagues/{league}/table:
+    get:
+      tags: [Leagues]
+      summary: Get league standings/table
+      parameters:
+        - in: path
+          name: league
+          required: true
+          schema:
+            type: string
+          example: "4328"
+          description: TheSportsDB league ID
+        - in: query
+          name: season
+          schema:
+            type: string
+          example: "2020-2021"
+      responses:
+        "200":
+          description: League table retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /teams/{team}:
+    get:
+      tags: [Teams]
+      summary: Get team details
+      parameters:
+        - in: path
+          name: team
+          required: true
+          schema:
+            type: string
+          example: "133604"
+          description: TheSportsDB team ID
+      responses:
+        "200":
+          description: Team retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Team not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /teams/{team}/previous-matches:
+    get:
+      tags: [Teams]
+      summary: Get a team's previous matches (times converted to WIB / Asia-Jakarta)
+      parameters:
+        - in: path
+          name: team
+          required: true
+          schema:
+            type: string
+          example: "133604"
+          description: TheSportsDB team ID
+      responses:
+        "200":
+          description: Previous matches retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /favorites:
+    get:
+      tags: [Favorites]
+      summary: List the authenticated user's favorite teams
+      security:
+        - sanctumToken: []
+      responses:
+        "200":
+          description: Favorite teams retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Favorites]
+      summary: Add a team to the authenticated user's favorites
+      security:
+        - sanctumToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [team_id, team_name]
+              properties:
+                team_id:
+                  type: string
+                  example: "133604"
+                team_name:
+                  type: string
+                  example: Arsenal
+                team_badge:
+                  type: string
+                  nullable: true
+                  example: https://r2.thesportsdb.com/images/media/team/badge/xzqdr11557767223.png
+      responses:
+        "201":
+          description: Team added to favorites
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Team already in favorites
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /favorites/{favorite}:
+    delete:
+      tags: [Favorites]
+      summary: Remove a team from the authenticated user's favorites
+      security:
+        - sanctumToken: []
+      parameters:
+        - in: path
+          name: favorite
+          required: true
+          schema:
+            type: integer
+          example: 1
+          description: Favorite team record ID (must belong to the authenticated user)
+      responses:
+        "200":
+          description: Team removed from favorites
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Favorite not found or not owned by the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    sanctumToken:
+      type: http
+      scheme: bearer
+      bearerFormat: "Sanctum Personal Access Token"
+      description: 'Send as "Authorization: Bearer <token>"'
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Success
+        data:
+          type: object
+          nullable: true
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Logged in successfully.
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+                name:
+                  type: string
+                  example: Jane Doe
+                email:
+                  type: string
+                  example: jane@example.com
+            token:
+              type: string
+              example: "1|abcdef123456..."
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Invalid credentials.
+        data:
+          nullable: true
+          example: null

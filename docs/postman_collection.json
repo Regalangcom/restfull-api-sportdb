@@ -1,0 +1,211 @@
+{
+	"info": {
+		"name": "Sport API",
+		"description": "Backend API gateway for TheSportsDB with Laravel Sanctum authentication and per-user favorite teams.\n\nAll responses use one envelope: { \"success\": bool, \"message\": string, \"data\": mixed }.\n\nHow to use:\n1. Run Register (or Login) and copy data.token from the response.\n2. Paste it into the collection variable `token`.\n3. Protected requests (Logout, Favorites) send it as `Authorization: Bearer {{token}}`.\n\nTheSportsDB responses are cached by Laravel for 10 minutes (file cache store). The frontend never calls TheSportsDB directly.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "base_url", "value": "http://localhost:8000/api" },
+		{ "key": "token", "value": "" },
+		{ "key": "favorite_id", "value": "1" }
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"description": "Registration, login and logout using Laravel Sanctum personal access tokens.",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"description": "Create a new user account and receive an API token.\n\nAuth: public.\n\nBody: name (required, max 255), email (required, unique), password (required, min 8), password_confirmation (must match password).\n\nResponses: 201 created (data.user + data.token), 422 validation error.",
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": "{{base_url}}/register",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@example.com\",\n    \"password\": \"password123\",\n    \"password_confirmation\": \"password123\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"request": {
+						"description": "Log in with email and password and receive an API token.\n\nAuth: public.\n\nBody: email (required), password (required).\n\nResponses: 200 success (data.user + data.token), 401 invalid credentials, 422 validation error.",
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": "{{base_url}}/login",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"jane@example.com\",\n    \"password\": \"password123\"\n}"
+						}
+					}
+				},
+				{
+					"name": "My Profile",
+					"request": {
+						"description": "Profile of the authenticated user (id, name, email) for the private profile page.\n\nAuth: Bearer token required.\n\nResponses: 200 success, 401 unauthenticated.",
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{token}}" }
+						],
+						"url": "{{base_url}}/me"
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"description": "Revoke the token used for this request (other tokens stay valid).\n\nAuth: Bearer token required.\n\nResponses: 200 success, 401 unauthenticated.",
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{token}}" }
+						],
+						"url": "{{base_url}}/logout"
+					}
+				}
+			]
+		},
+		{
+			"name": "Leagues",
+			"description": "League data proxied from TheSportsDB. Public endpoints, cached for 10 minutes.",
+			"item": [
+				{
+					"name": "List Sports",
+					"request": {
+						"description": "List sports (Soccer, Basketball, ...). Use a strSport value as the sport query of List Leagues.\n\nAuth: public.\n\nCache key: thesportsdb.sports\n\nResponses: 200 success, 502 if TheSportsDB is unavailable.",
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"url": "{{base_url}}/sports"
+					}
+				},
+				{
+					"name": "List Leagues",
+					"request": {
+						"description": "List leagues (name, sport, logo in strBadge) from TheSportsDB. strBadge is null when the free tier has no logo for that league.\n\nAuth: public.\n\nQuery: sport (optional) - filter by sport name, e.g. Soccer or Basketball. Omit to list all sports.\n\nCache key: thesportsdb.leagues.{sport}\n\nResponses: 200 success, 502 if TheSportsDB is unavailable.",
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"url": {
+							"raw": "{{base_url}}/leagues?sport=Soccer",
+							"host": [ "{{base_url}}" ],
+							"path": [ "leagues" ],
+							"query": [ { "key": "sport", "value": "Soccer" } ]
+						}
+					}
+				},
+				{
+					"name": "Teams by League",
+					"request": {
+						"description": "List all teams in a league.\n\nAuth: public.\n\nPath: league - TheSportsDB league ID (idLeague from List Leagues), e.g. 4328 = English Premier League.\n\nCache key: thesportsdb.league_teams.{leagueId}\n\nResponses: 200 success (empty array if the league is unknown), 502 if TheSportsDB is unavailable.",
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"url": "{{base_url}}/leagues/4328/teams"
+					}
+				},
+				{
+					"name": "League Table",
+					"request": {
+						"description": "League standings (points table).\n\nAuth: public.\n\nPath: league - TheSportsDB league ID.\nQuery: season (optional) - e.g. 2020-2021. Defaults to the current season.\n\nNote: TheSportsDB only supports standings for featured soccer leagues.\n\nCache key: thesportsdb.league_table.{leagueId}.{season|current}\n\nResponses: 200 success, 502 if TheSportsDB is unavailable.",
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"url": {
+							"raw": "{{base_url}}/leagues/4328/table?season=2020-2021",
+							"host": [ "{{base_url}}" ],
+							"path": [ "leagues", "4328", "table" ],
+							"query": [ { "key": "season", "value": "2020-2021" } ]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Teams",
+			"description": "Team data proxied from TheSportsDB. Public endpoints, cached for 10 minutes.",
+			"item": [
+				{
+					"name": "Team Details",
+					"request": {
+						"description": "Details of a single team (name, badge, stadium, description, etc.).\n\nAuth: public.\n\nPath: team - TheSportsDB team ID, e.g. 133604 = Arsenal.\n\nCache key: thesportsdb.team.{teamId}\n\nResponses: 200 success, 404 team not found, 502 if TheSportsDB is unavailable.",
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"url": "{{base_url}}/teams/133604"
+					}
+				},
+				{
+					"name": "Team Previous Matches",
+					"request": {
+						"description": "Recent past matches of a team. Match time is converted from UTC to Indonesian Western Time (WIB, Asia/Jakarta) in the field match_time_wib.\n\nAuth: public.\n\nPath: team - TheSportsDB team ID.\n\nCache key: thesportsdb.team_previous.{teamId}\n\nNote: the free TheSportsDB key only returns home events.\n\nResponses: 200 success, 502 if TheSportsDB is unavailable.",
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json" }
+						],
+						"url": "{{base_url}}/teams/133604/previous-matches"
+					}
+				}
+			]
+		},
+		{
+			"name": "Favorites",
+			"description": "Favorite teams stored in the local PostgreSQL database. All endpoints require a Bearer token and only touch the authenticated user's own favorites.",
+			"item": [
+				{
+					"name": "List Favorites",
+					"request": {
+						"description": "List all favorite teams of the authenticated user, newest first.\n\nAuth: Bearer token required.\n\nResponses: 200 success, 401 unauthenticated.",
+						"method": "GET",
+						"header": [
+							{ "key": "Accept", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{token}}" }
+						],
+						"url": "{{base_url}}/favorites"
+					}
+				},
+				{
+					"name": "Add Favorite",
+					"request": {
+						"description": "Add a team to the authenticated user's favorites. Ownership comes from the token, never from the request body.\n\nAuth: Bearer token required.\n\nBody: team_id (required, TheSportsDB team ID), team_name (required), team_badge (optional URL).\n\nResponses: 201 created, 401 unauthenticated, 409 team already in favorites, 422 validation error.",
+						"method": "POST",
+						"header": [
+							{ "key": "Accept", "value": "application/json" },
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{token}}" }
+						],
+						"url": "{{base_url}}/favorites",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"team_id\": \"133604\",\n    \"team_name\": \"Arsenal\",\n    \"team_badge\": \"https://r2.thesportsdb.com/images/media/team/badge/xzqdr11557767223.png\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Remove Favorite",
+					"request": {
+						"description": "Remove a team from the authenticated user's favorites.\n\nAuth: Bearer token required.\n\nPath: favorite - the favorite record ID (the id field from List Favorites, not the TheSportsDB team ID). Set the collection variable favorite_id.\n\nResponses: 200 success, 401 unauthenticated, 404 not found or not owned by the user.",
+						"method": "DELETE",
+						"header": [
+							{ "key": "Accept", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{token}}" }
+						],
+						"url": "{{base_url}}/favorites/{{favorite_id}}"
+					}
+				}
+			]
+		}
+	]
+}
