@@ -189,7 +189,7 @@ vendor/bin/pint
 
 ## Troubleshooting
 
-- **`could not find driver`** — enable `pdo_pgsql` (and `pdo_sqlite` for tests) in `php.ini`.
+- **`could not find driver`** — enable `pdo_pgsql` (and `pdo_sqlite` for tests) in `php.ini`. i am using laragon for running pgsql
 - **`SQLSTATE ... password authentication failed`** — check `DB_USERNAME` / `DB_PASSWORD` in `.env`, then `php artisan config:clear`.
 - **502 from the API** — TheSportsDB is unreachable, or the free-key rate limit (30 requests/minute) was hit. Wait a minute and retry.
 - **Browser CORS or 401/403 errors (`cookies` branch)** — `FRONTEND_URL` must exactly match the frontend origin, requests must use `withCredentials`, and unsafe methods need the `X-Requested-With` header. Restart `php artisan serve` after editing `.env`.
