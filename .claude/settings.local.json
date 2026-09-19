@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(php artisan make:controller SportController --no-interaction)"
-    ]
-  }
-}
