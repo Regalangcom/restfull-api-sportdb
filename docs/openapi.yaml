@@ -365,6 +365,14 @@ paths:
 
 components:
   securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: api_token
+      description: >
+        HttpOnly cookie set by /register and /login. Send requests with credentials
+        (withCredentials) and, for POST/PUT/PATCH/DELETE, the header
+        `X-Requested-With: XMLHttpRequest`.
     sanctumToken:
       type: http
       scheme: bearer
@@ -407,9 +415,7 @@ components:
                 email:
                   type: string
                   example: jane@example.com
-            token:
-              type: string
-              example: "1|abcdef123456..."
+          description: The Sanctum token is NOT in the body. It is set as the HttpOnly cookie `api_token`.
     ErrorResponse:
       type: object
       properties:

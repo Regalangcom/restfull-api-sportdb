@@ -1,12 +1,11 @@
 {
 	"info": {
 		"name": "Sport API",
-		"description": "Backend API gateway for TheSportsDB with Laravel Sanctum authentication and per-user favorite teams.\n\nAll responses use one envelope: { \"success\": bool, \"message\": string, \"data\": mixed }.\n\nHow to use:\n1. Run Register (or Login) and copy data.token from the response.\n2. Paste it into the collection variable `token`.\n3. Protected requests (Logout, Favorites) send it as `Authorization: Bearer {{token}}`.\n\nTheSportsDB responses are cached by Laravel for 10 minutes (file cache store). The frontend never calls TheSportsDB directly.",
+		"description": "Backend API gateway for TheSportsDB with Laravel Sanctum authentication and per-user favorite teams.\n\nAll responses use one envelope: { \"success\": bool, \"message\": string, \"data\": mixed }.\n\nHow to use:\n1. Run Register (or Login). The Sanctum token is set as the HttpOnly cookie api_token (it is not in the response body) and Postman stores it in its cookie jar automatically.\n2. Protected requests then authenticate through that cookie.\n3. POST/DELETE requests must send the header X-Requested-With: XMLHttpRequest (already included).\n\nTheSportsDB responses are cached by Laravel for 10 minutes (file cache store). The frontend never calls TheSportsDB directly.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
 		{ "key": "base_url", "value": "http://localhost:8000/api" },
-		{ "key": "token", "value": "" },
 		{ "key": "favorite_id", "value": "1" }
 	],
 	"item": [
@@ -17,7 +16,7 @@
 				{
 					"name": "Register",
 					"request": {
-						"description": "Create a new user account and receive an API token.\n\nAuth: public.\n\nBody: name (required, max 255), email (required, unique), password (required, min 8), password_confirmation (must match password).\n\nResponses: 201 created (data.user + data.token), 422 validation error.",
+						"description": "Create a new user account. The API token is returned as the HttpOnly cookie api_token.\n\nAuth: public.\n\nBody: name (required, max 255), email (required, unique), password (required, min 8), password_confirmation (must match password).\n\nResponses: 201 created (data.user, plus the api_token cookie), 422 validation error.",
 						"method": "POST",
 						"header": [
 							{ "key": "Accept", "value": "application/json" },
@@ -33,7 +32,7 @@
 				{
 					"name": "Login",
 					"request": {
-						"description": "Log in with email and password and receive an API token.\n\nAuth: public.\n\nBody: email (required), password (required).\n\nResponses: 200 success (data.user + data.token), 401 invalid credentials, 422 validation error.",
+						"description": "Log in with email and password. The API token is returned as the HttpOnly cookie api_token.\n\nAuth: public.\n\nBody: email (required), password (required).\n\nResponses: 200 success (data.user, plus the api_token cookie), 401 invalid credentials, 422 validation error.",
 						"method": "POST",
 						"header": [
 							{ "key": "Accept", "value": "application/json" },
@@ -49,11 +48,11 @@
 				{
 					"name": "My Profile",
 					"request": {
-						"description": "Profile of the authenticated user (id, name, email) for the private profile page.\n\nAuth: Bearer token required.\n\nResponses: 200 success, 401 unauthenticated.",
+						"description": "Profile of the authenticated user (id, name, email) for the private profile page.\n\nAuth: login cookie (api_token) required.\n\nResponses: 200 success, 401 unauthenticated.",
 						"method": "GET",
 						"header": [
 							{ "key": "Accept", "value": "application/json" },
-							{ "key": "Authorization", "value": "Bearer {{token}}" }
+							{ "key": "X-Requested-With", "value": "XMLHttpRequest" }
 						],
 						"url": "{{base_url}}/me"
 					}
@@ -61,11 +60,11 @@
 				{
 					"name": "Logout",
 					"request": {
-						"description": "Revoke the token used for this request (other tokens stay valid).\n\nAuth: Bearer token required.\n\nResponses: 200 success, 401 unauthenticated.",
+						"description": "Revoke the token used for this request (other tokens stay valid).\n\nAuth: login cookie (api_token) required.\n\nResponses: 200 success, 401 unauthenticated.",
 						"method": "POST",
 						"header": [
 							{ "key": "Accept", "value": "application/json" },
-							{ "key": "Authorization", "value": "Bearer {{token}}" }
+							{ "key": "X-Requested-With", "value": "XMLHttpRequest" }
 						],
 						"url": "{{base_url}}/logout"
 					}
@@ -162,16 +161,16 @@
 		},
 		{
 			"name": "Favorites",
-			"description": "Favorite teams stored in the local PostgreSQL database. All endpoints require a Bearer token and only touch the authenticated user's own favorites.",
+			"description": "Favorite teams stored in the local PostgreSQL database. All endpoints require the login cookie and only touch the authenticated user's own favorites.",
 			"item": [
 				{
 					"name": "List Favorites",
 					"request": {
-						"description": "List all favorite teams of the authenticated user, newest first.\n\nAuth: Bearer token required.\n\nResponses: 200 success, 401 unauthenticated.",
+						"description": "List all favorite teams of the authenticated user, newest first.\n\nAuth: login cookie (api_token) required.\n\nResponses: 200 success, 401 unauthenticated.",
 						"method": "GET",
 						"header": [
 							{ "key": "Accept", "value": "application/json" },
-							{ "key": "Authorization", "value": "Bearer {{token}}" }
+							{ "key": "X-Requested-With", "value": "XMLHttpRequest" }
 						],
 						"url": "{{base_url}}/favorites"
 					}
@@ -179,12 +178,12 @@
 				{
 					"name": "Add Favorite",
 					"request": {
-						"description": "Add a team to the authenticated user's favorites. Ownership comes from the token, never from the request body.\n\nAuth: Bearer token required.\n\nBody: team_id (required, TheSportsDB team ID), team_name (required), team_badge (optional URL).\n\nResponses: 201 created, 401 unauthenticated, 409 team already in favorites, 422 validation error.",
+						"description": "Add a team to the authenticated user's favorites. Ownership comes from the token, never from the request body.\n\nAuth: login cookie (api_token) required.\n\nBody: team_id (required, TheSportsDB team ID), team_name (required), team_badge (optional URL).\n\nResponses: 201 created, 401 unauthenticated, 409 team already in favorites, 422 validation error.",
 						"method": "POST",
 						"header": [
 							{ "key": "Accept", "value": "application/json" },
 							{ "key": "Content-Type", "value": "application/json" },
-							{ "key": "Authorization", "value": "Bearer {{token}}" }
+							{ "key": "X-Requested-With", "value": "XMLHttpRequest" }
 						],
 						"url": "{{base_url}}/favorites",
 						"body": {
@@ -196,11 +195,11 @@
 				{
 					"name": "Remove Favorite",
 					"request": {
-						"description": "Remove a team from the authenticated user's favorites.\n\nAuth: Bearer token required.\n\nPath: favorite - the favorite record ID (the id field from List Favorites, not the TheSportsDB team ID). Set the collection variable favorite_id.\n\nResponses: 200 success, 401 unauthenticated, 404 not found or not owned by the user.",
+						"description": "Remove a team from the authenticated user's favorites.\n\nAuth: login cookie (api_token) required.\n\nPath: favorite - the favorite record ID (the id field from List Favorites, not the TheSportsDB team ID). Set the collection variable favorite_id.\n\nResponses: 200 success, 401 unauthenticated, 404 not found or not owned by the user.",
 						"method": "DELETE",
 						"header": [
 							{ "key": "Accept", "value": "application/json" },
-							{ "key": "Authorization", "value": "Bearer {{token}}" }
+							{ "key": "X-Requested-With", "value": "XMLHttpRequest" }
 						],
 						"url": "{{base_url}}/favorites/{{favorite_id}}"
 					}

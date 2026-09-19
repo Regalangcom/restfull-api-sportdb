@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Concerns\ApiResponse;
+use App\Http\Middleware\AuthenticateFromCookie;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Symfony\Component\HttpFoundation\Cookie;
 
 class AuthController extends Controller
 {
@@ -22,12 +24,8 @@ class AuthController extends Controller
             'password' => Hash::make($request->string('password')),
         ]);
 
-        $token = $user->createToken('api-token')->plainTextToken;
-
-        return $this->success([
-            'user' => $user,
-            'token' => $token,
-        ], 'Registered successfully.', 201);
+        return $this->success(['user' => $user], 'Registered successfully.', 201)
+            ->withCookie($this->tokenCookie($user));
     }
 
     public function login(LoginRequest $request): JsonResponse
@@ -38,12 +36,8 @@ class AuthController extends Controller
             return $this->error('Invalid credentials.', 401);
         }
 
-        $token = $user->createToken('api-token')->plainTextToken;
-
-        return $this->success([
-            'user' => $user,
-            'token' => $token,
-        ], 'Logged in successfully.');
+        return $this->success(['user' => $user], 'Logged in successfully.')
+            ->withCookie($this->tokenCookie($user));
     }
 
     public function me(Request $request): JsonResponse
@@ -55,6 +49,22 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()?->delete();
 
-        return $this->success(null, 'Logged out successfully.');
+        return $this->success(null, 'Logged out successfully.')
+            ->withoutCookie(AuthenticateFromCookie::COOKIE_NAME);
+    }
+
+    private function tokenCookie(User $user): Cookie
+    {
+        return cookie(
+            name: AuthenticateFromCookie::COOKIE_NAME,
+            value: $user->createToken('api-token')->plainTextToken,
+            minutes: (int) config('sanctum.expiration'),
+            path: '/',
+            domain: null,
+            secure: app()->isProduction(),
+            httpOnly: true,
+            raw: false,
+            sameSite: 'lax',
+        );
     }
 }
